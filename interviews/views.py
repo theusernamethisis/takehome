@@ -1,11 +1,11 @@
-from django.shortcuts import render
+from django.shortcuts import render, get_object_or_404
 
 from services.mock_availability import get_free_busy_data
 from .serializers import InterviewAvailabilitySerializer
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import InterviewTemplate
+from .models import InterviewTemplate, Interviewer
 from rest_framework import viewsets
 
 class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
@@ -38,6 +38,26 @@ class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
         except InterviewTemplate.DoesNotExist:
             return Response(
                 {"error": "Interview template not found"}, 
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+    @action(detail=False, methods=["get"], url_path=r"interviewer/(?P<interviewer_id>\d+)", permission_classes=[AllowAny])
+    def interviewer_busy_data(self, request, interviewer_id=None):
+        try:
+            interviewer = get_object_or_404(Interviewer, id=interviewer_id)
+            
+            busy_data = get_free_busy_data([interviewer_id])
+            
+            response_data = {
+                "interviewerId": interviewer.id,
+                "name": f"{interviewer.first_name} {interviewer.last_name}",
+                "busyPeriods": busy_data[0]['busy'] if busy_data and busy_data[0]['busy'] else []
+            }
+            
+            return Response(response_data)
+        except Interviewer.DoesNotExist:
+            return Response(
+                {"error": f"Interviewer with ID {interviewer_id} not found"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
     
