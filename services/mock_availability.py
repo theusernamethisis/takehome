@@ -3,6 +3,7 @@ from collections import defaultdict
 from faker import Faker
 import random
 import json
+import math
 
 fake = Faker()
 Faker.seed(0)
@@ -31,7 +32,7 @@ Faker.seed(0)
 
 #     return busy_blocks
 
-def generate_busy_blocks(start_date, days=3):
+def generate_busy_blocks(start_date, days=2):
     busy_blocks = []
     work_hours = (9, 17)  # Work hours from 9 AM to 5 PM
 
@@ -197,13 +198,58 @@ def get_shared_slots(interviewers_availability: dict[int, dict[date, list[time]]
     
     return shared_slots
 
+def get_interview_slots(matching_slots, duration):
+    def find_required_slots(slots, start_index, count):
+        for i in range(start_index, start_index + count - 1):   # check slots sequentially for contiguous block
+            curr_slot_end_time = slots[i][1]
+            next_slot_start_time = slots[i+1][0]
+            
+            if curr_slot_end_time != next_slot_start_time:      # return false if they dont match (gap)
+                return False
+        return True
+
+    slot_size = 30  # minutes
+    slots_needed = math.ceil(duration / slot_size)
+    available_interviews = []
+    
+    for day, time_slots in matching_slots.items():
+        sorted_slots = sorted(time_slots)
+        
+        # check each possible starting position for a sequence of consecutive time slots that fit the required slots_needed
+        for start_index in range(len(sorted_slots) - slots_needed + 1): # include last slot
+            # Check if slots from start_index are consecutive
+            if find_required_slots(sorted_slots, start_index, slots_needed):
+                # Create interview slot if required slots are available
+                interview_start = datetime.combine(day, sorted_slots[start_index][0])
+                interview_end = interview_start + timedelta(minutes=duration)
+                interview_slot = {
+                    "start": interview_start.isoformat(),
+                    "end": interview_end.isoformat()
+                }
+                available_interviews.append(interview_slot)
+    
+    return available_interviews
+
 i1 = get_available_slots(data[0]["busy"])
 i2 = get_available_slots(data[1]["busy"])
 
-print_available_slots(i1)
+#print_available_slots(i1)
 print("\n**************************************\n")
-print_available_slots(i2)
+#print_available_slots(i2)
 
 interviewers_availability = {}
 interviewers_availability[1] = get_available_slots(data[0]["busy"])
 interviewers_availability[2] = get_available_slots(data[1]["busy"])
+
+matching_slots = get_shared_slots(interviewers_availability)
+print_available_slots(matching_slots)
+print("\n======================================\n")
+
+duration = 72  # minutes
+available_meetings = get_interview_slots(matching_slots, duration)
+
+print(f"\nAvailable {duration}-minute interview slots:")
+for slot in available_meetings:
+    start = datetime.fromisoformat(slot["start"])
+    end = datetime.fromisoformat(slot["end"])
+    print(f"{start.strftime("%Y-%m-%d %I:%M %p")} to {end.strftime("%Y-%m-%d %I:%M %p")}")
