@@ -171,6 +171,32 @@ def get_available_slots(busy_slots: list[dict[str, str]]):
     
     return all_available_slots
 
+def get_shared_slots(interviewers_availability: dict[int, dict[date, list[time]]]) -> dict[date, list[time]]:
+    date_counts = defaultdict(dict)
+    
+    # count occurrences for every slot held by interviewers
+    for all_slots in interviewers_availability.values():
+        for date, times in all_slots.items():
+            for time in times:
+                date_counts[date][time] = date_counts[date].get(time, 0) + 1
+    
+    # find slot overlap
+    shared_slots = {}
+    interviewers_count = len(interviewers_availability)
+    for date in sorted(date_counts.keys()):
+        common_times = []
+        
+        for time, count in date_counts[date].items():
+            if count == interviewers_count:
+                common_times.append(time)
+        
+        # Only add dates with available times
+        if common_times:
+            sorted_times = sorted(common_times)
+            shared_slots[date] = sorted_times
+    
+    return shared_slots
+
 i1 = get_available_slots(data[0]["busy"])
 i2 = get_available_slots(data[1]["busy"])
 
