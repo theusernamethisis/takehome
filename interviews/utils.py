@@ -12,6 +12,7 @@ def get_available_slots(busy_slots: list[dict[str, str]]):
     work_hours = (9, 17)  # 9 AM to 5 PM
     busy_days = defaultdict(set)
     dates = set()
+    cutoff_datetime = datetime.utcnow() + timedelta(hours=24) # No slot may begin before this (less than 24 hours in the future)
     
     for slot in busy_slots:
         start_dt = datetime.fromisoformat(slot["start"].rstrip("Z"))
@@ -69,6 +70,10 @@ def get_available_slots(busy_slots: list[dict[str, str]]):
                 start_minute = 30
             start_time = time(start_hour, start_minute)
             
+            slot_datetime = datetime.combine(day, time(start_hour, start_minute))
+            if slot_datetime < cutoff_datetime: # check cutoff threshold 
+                continue
+
             # Find end time (30 mins later)
             end_hour = start_hour
             if start_minute == 0:
