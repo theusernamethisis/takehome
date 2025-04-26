@@ -23,8 +23,13 @@ class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             template = self.get_object()
             interviewer_ids = list(template.interviewers.values_list("id", flat=True))
+            interviewers_data = list(template.interviewers.values("id", "first_name", "last_name"))
+            interviewer_names = {
+                interviewer["id"]: f"{interviewer["first_name"]} {interviewer["last_name"]}"
+                for interviewer in interviewers_data
+            }
 
-            busy_data = get_free_busy_data(interviewer_ids)
+            busy_data = get_free_busy_data(interviewer_ids, interviewer_names)
             log_busydata(busy_data) 
             
             available_slots = calc_available_slots(busy_data, interviewer_ids, template.duration)

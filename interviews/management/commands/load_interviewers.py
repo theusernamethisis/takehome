@@ -22,6 +22,7 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"Created interviewer: {interviewer}"))
         
         template_data = [
+            {"name": "Phone call", "duration": 15},
             {"name": "Technical", "duration": 60},
             {"name": "HR Interview", "duration": 45},
             {"name": "System Design", "duration": 90}
@@ -35,8 +36,10 @@ class Command(BaseCommand):
             
             # Assign interviewers (different combinations for each template)
             if i == 0:  # Technical
+                template.interviewers.add(interviewers[1], interviewers[3])
+            if i == 1:  # Technical
                 template.interviewers.add(interviewers[0], interviewers[1])
-            elif i == 1:  # HR Interview
+            elif i == 2:  # HR Interview
                 template.interviewers.add(interviewers[2], interviewers[3])
             else:  # System Design
                 template.interviewers.add(interviewers[0], interviewers[2], interviewers[3])

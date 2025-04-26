@@ -70,14 +70,14 @@ def generate_busy_blocks(start_date, days=7):
     return busy_blocks
 
 
-def get_free_busy_data(interviewer_ids: list[int]) -> list[dict]:
+def get_free_busy_data(interviewer_ids: list[int], interviewer_names: dict[int, str]) -> list[dict]:
     start_date = datetime.utcnow().date()
     data = []
 
     for id_ in interviewer_ids:
         interviewer = {
             "interviewerId": id_,
-            "name": fake.name(),
+            "name": interviewer_names[id_], #fake.name(),
             "busy": generate_busy_blocks(start_date)  # Changed from 'availability' to 'busy'
         }
         data.append(interviewer)
