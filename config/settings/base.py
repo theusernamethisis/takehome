@@ -272,8 +272,22 @@ LOGGING = {
             "class": "logging.StreamHandler",
             "formatter": "verbose",
         },
+        "interview_file": { #<--------------------------------------------------------------------------------------------------------------------------------
+            "level": "DEBUG",
+            "class": "logging.FileHandler",
+            "filename": str(BASE_DIR / "logs" / "interviews_availability.log"),
+            "formatter": "verbose",
+        },
     },
     "root": {"level": "INFO", "handlers": ["console"]},
+    "loggers": { #<-------------------------------------------------------------------------------------------------------------------------------------------
+        "interviews_availability": {
+            "handlers": ["console", "interview_file"],
+            "level": "DEBUG",
+            "propagate": False,
+        },
+    },
+
 }
 
 REDIS_URL = env("REDIS_URL", default="redis://redis:6379/0")

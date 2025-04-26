@@ -8,6 +8,10 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework import viewsets
 from .utils import *
+import logging
+
+# /logs/interviews_availability.log
+logger = logging.getLogger("interviews_availability")
 
 class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = InterviewTemplate.objects.all()
@@ -19,8 +23,9 @@ class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
         try:
             template = self.get_object()
             interviewer_ids = list(template.interviewers.values_list("id", flat=True))
-            
+
             busy_data = get_free_busy_data(interviewer_ids)
+            log_busydata(busy_data) 
             
             available_slots = calc_available_slots(busy_data, interviewer_ids, template.duration)
             
