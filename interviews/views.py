@@ -2,11 +2,12 @@ from django.shortcuts import render, get_object_or_404
 
 from services.mock_availability import get_free_busy_data
 from .serializers import InterviewAvailabilitySerializer
+from .models import InterviewTemplate, Interviewer
 from rest_framework.permissions import AllowAny
 from rest_framework.decorators import action
 from rest_framework.response import Response
-from .models import InterviewTemplate, Interviewer
 from rest_framework import viewsets
+from .utils import *
 
 class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = InterviewTemplate.objects.all()
@@ -21,7 +22,7 @@ class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
             
             busy_data = get_free_busy_data(interviewer_ids)
             
-            available_slots = self.calc_available_slots(busy_data, template.duration)
+            available_slots = calc_available_slots(busy_data, interviewer_ids, template.duration)
             
             response_data = {
                 "interviewId": template.id,
@@ -51,7 +52,7 @@ class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
             response_data = {
                 "interviewerId": interviewer.id,
                 "name": f"{interviewer.first_name} {interviewer.last_name}",
-                "busyPeriods": busy_data[0]['busy'] if busy_data and busy_data[0]['busy'] else []
+                "busyPeriods": busy_data[0]["busy"] if busy_data and busy_data[0]["busy"] else []
             }
             
             return Response(response_data)
@@ -60,11 +61,3 @@ class InterviewTemplateViewSet(viewsets.ReadOnlyModelViewSet):
                 {"error": f"Interviewer with ID {interviewer_id} not found"}, 
                 status=status.HTTP_404_NOT_FOUND
             )
-    
-    def calc_available_slots(self, busy_data, duration):
-        return [
-            {
-                "start": "2025-04-24T10:00:00Z",
-                "end": "2025-04-24T10:00:00Z"
-            }
-        ]
