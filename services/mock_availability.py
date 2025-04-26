@@ -32,6 +32,7 @@ Faker.seed(0)
 
 #     return busy_blocks
 
+# add random 30 mins at start or end
 def generate_busy_blocks(start_date, days=7):
     busy_blocks = []
     work_hours = (9, 17)  # Work hours from 9 AM to 5 PM
@@ -45,14 +46,15 @@ def generate_busy_blocks(start_date, days=7):
         duration_hours = random.randint(1, 2)
 
         # to add or not to add 30 minutes
-        add_half_hour = random.choice([True, False])
+        add_half_hour_start = random.choice([True, False])
 
         start_dt = datetime.combine(date, time(start_hour, 0)).replace(tzinfo=None)
-        if add_half_hour:
+        if add_half_hour_start:
             start_dt += timedelta(minutes=30)
 
+        add_half_hour_end = random.choice([True, False])
         end_dt = start_dt + timedelta(hours=duration_hours)
-        if add_half_hour:
+        if add_half_hour_end:
             end_dt += timedelta(minutes=30)
 
         # dont go past work hours
