@@ -47,6 +47,9 @@ def get_available_slots(busy_slots: list[dict[str, str]]):
     # find all available slots
     all_available_slots = {}
     for day in sorted(dates):
+        if day.weekday() >= 5: # Skip Saturday and Sunday (5, 6)
+            continue
+
         # All possible work hour 30-minute slots
         # 16 slots per dat
         work_start_slot = work_hours[0] * 2  # 18
