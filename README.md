@@ -1,273 +1,166 @@
-# **Dynamic Interview Slot Generator (Django)**
+# Dynamically Generating Potential Interview Time Slots
 
-## 🗂️ Overview
+## Setup
 
-IImplement a backend feature for a scheduling tool. The goal is to **dynamically generate potential interview time slots** by intersecting the real-time availability of multiple interviewers.
+I used Django app creation to make **`interviews`** to make the structure containing the models, views, serializers, utility functions, script to load starting data. I opted to use PostgreSQL for the database.
 
-Unlike systems with static slots, this exercise simulates a more realistic setup — pulling external calendar data, evaluating overlapping availability, and applying constraints.
+I modified
 
----
+- config/api_router.py
+- config/settings/base.py
 
-## 🎯 Goal
-
-Build an API that, given an interview template ID, returns potential time slots where **all assigned interviewers are available at the same time** for the required duration.
-
----
-
-## 🛠️ Tech Stack
-
-You must use:
-
-- Python 3.10+
-- Django 4.x
-- Django REST Framework (DRF)
-- SQLite or PostgreSQL
-- Faker (already used in provided helper)
-
----
-
-## 📋 Core Requirements
-
-### ✅ Models
-
-You'll need to implement models to support this feature. At a minimum:
-
-- `Interviewer`: represents someone who conducts interviews
-- `InterviewTemplate`: represents a type of interview, with:
-    - A name (e.g., "Technical Interview")
-    - A duration in minutes (e.g., 60)
-    - A many-to-many relationship to Interviewers
-
-You're free to design additional models if it helps with clarity or flexibility.
-
----
-
-### ✅ Endpoint
+**Running the Application**
 
 ```bash
-GET /api/interviews/<id>/availability
+export DATABASE_URL=postgres://postgres:postgres@postgres:5432/candidate_fyi_takehome_project
+export USE_DOCKER=yes
+
+# starting
+docker-compose -f docker-compose.local.yml up
+
+# create migrations
+docker-compose -f docker-compose.local.yml exec django python manage.py makemigrations interviews
+
+# apply migrations
+docker-compose -f docker-compose.local.yml exec django python manage.py migrate
+
+# load test data
+docker-compose -f docker-compose.local.yml exec django python manage.py load_interviewers
 ```
 
-This endpoint should:
+The API will be available at: http://localhost:8000/api/interviews/<id>/availability
 
-1. Load the `InterviewTemplate` with the given ID
-2. Use the **provided mock service** to fetch availability for all associated interviewers
-3. Return **only time slots where all interviewers are simultaneously available** for the required duration
-4. Format the result as a JSON response
-
----
-
-## 🧾 Interviewer Availability Service
-
-To simulate the external calendar system, use the helper in:
-
-```
-service/mock_availability.py
-```
-
-Import and call the function like so:
-
-```python
-from service.mock_availability import get_free_busy_data
-
-interviewer_ids = [1, 2]
-busy_data = get_free_busy_data(interviewer_ids)
-
-```
-
-### 🔄 Sample Output
+**Sample**
 
 ```json
 [
-  {
-    "interviewerId": 1,
-    "name": "Alice Johnson",
-    "busy": [
-      { "start": "2025-01-22T09:00:00Z", "end": "2025-01-22T12:00:00Z" }
-    ]
-  },
-  {
-    "interviewerId": 2,
-    "name": "Bob Smith",
-    "busy": [
-      { "start": "2025-01-22T10:00:00Z", "end": "2025-01-22T13:00:00Z" }
-    ]
-  }
+    {
+        "interviewerId": 3,
+        "name": "Thomas Jefferson",
+        "busy": [
+            {
+                "start": "2025-04-29T09:30:00Z",
+                "end": "2025-04-29T12:00:00Z"
+            },
+            {
+                "start": "2025-04-28T11:30:00Z",
+                "end": "2025-04-28T12:30:00Z"
+            },
+            {
+                "start": "2025-04-28T13:00:00Z",
+                "end": "2025-04-28T15:30:00Z"
+            },
+            {
+                "start": "2025-04-28T10:00:00Z",
+                "end": "2025-04-28T12:00:00Z"
+            }
+        ]
+    },
+    {
+        "interviewerId": 4,
+        "name": "James Madison",
+        "busy": [
+            {
+                "start": "2025-04-29T12:30:00Z",
+                "end": "2025-04-29T14:00:00Z"
+            },
+            {
+                "start": "2025-04-28T10:30:00Z",
+                "end": "2025-04-28T11:30:00Z"
+            },
+            {
+                "start": "2025-04-29T11:00:00Z",
+                "end": "2025-04-29T12:30:00Z"
+            },
+            {
+                "start": "2025-04-29T11:00:00Z",
+                "end": "2025-04-29T12:00:00Z"
+            },
+            {
+                "start": "2025-04-29T15:00:00Z",
+                "end": "2025-04-29T16:00:00Z"
+            },
+            {
+                "start": "2025-04-28T14:00:00Z",
+                "end": "2025-04-28T16:00:00Z"
+            }
+        ]
+    }
 ]
 ```
 
-> ✅ You are welcome to enhance or modify this service as needed — e.g., to support filtering, partial day simulation, or sorting.
+```
+Available slots (ID: 3):
+2025-04-28 (Monday)
+-------------------
 
----
+2025-04-29 (Tuesday)
+--------------------
+  2:30 PM - 3:00 PM
+  3:00 PM - 3:30 PM
+  3:30 PM - 4:00 PM
+  4:00 PM - 4:30 PM
+  4:30 PM - 5:00 PM
 
-## 📤 API Response Format
+Available slots (ID: 4):
+2025-04-28 (Monday)
+-------------------
+
+2025-04-29 (Tuesday)
+--------------------
+  2:30 PM - 3:00 PM
+  4:00 PM - 4:30 PM
+  4:30 PM - 5:00 PM
+
+Available slots (Shared):
+2025-04-29 (Tuesday)
+--------------------
+  2:30 PM - 3:00 PM
+  4:00 PM - 4:30 PM
+  4:30 PM - 5:00 PM
+
+Available 45-minute interview slots:
+2025-04-29 04:00 PM to 2025-04-29 04:45 PM
+```
 
 ```json
 {
-  "interviewId": 1,
-  "name": "Technical Interview",
-  "durationMinutes": 60,
-  "interviewers": [
-    { "id": 1, "name": "Alice Johnson" },
-    { "id": 2, "name": "Bob Smith" }
-  ],
-  "availableSlots": [
-    {
-      "start": "2025-01-22T10:00:00Z",
-      "end": "2025-01-22T11:00:00Z"
-    },
-    {
-      "start": "2025-01-22T11:00:00Z",
-      "end": "2025-01-22T12:00:00Z"
-    }
-  ]
+    "interviewId": 3,
+    "name": "HR Interview",
+    "durationMinutes": 45,
+    "interviewers": [
+        {
+            "id": 3,
+            "name": "Thomas Jefferson"
+        },
+        {
+            "id": 4,
+            "name": "James Madison"
+        }
+    ],
+    "availableSlots": [
+        {
+            "start": "2025-04-29T16:00:00Z",
+            "end": "2025-04-29T16:45:00Z"
+        }
+    ]
 }
 ```
 
----
+## Design
 
-## ⚠️ Constraints
+Obtaining the slots of busy time (in hours) for interviewers is done calling **`get_free_busy_data()`** to generate mock data. In the constraints, it is stated that “Slots must begin on hour or half-hour marks**”** which aligns with the returned mock data. While working on a solution, I realized that interview templates that are ≤ 30 mins would fill an interviewers full available slots, since it is in hour intervals. This seemed inefficient, so I made the design decision to change how the creation of available interviewer slots is done. Instead of hour slots, I increased the resolution by finding all 30 minute free periods for the interviews within **`get_available_slots()`.** I also adjusted **`get_free_busy_data()`** to randomly add 30 mins to start or end of each busy block to reflect my change, even though the hour blocks it previously generated will still work with my solution, now I can have slots which begin on both hour and half-hour marks. 
 
-You must enforce the following:
+I observed the constraint that “no slot may begin less than 24 hours in the future”, but also employed checks to only create available interviewer slots that are only within the 9:00 AM - 5:00 PM schedule and also that none are created during the weekend. 
 
-- Slots must be **exactly** the duration minutes of the template
-- Slots must begin on **hour or half-hour marks** (e.g., 10:00, 10:30)
-- **All interviewers must be available** for the full slot duration
-- **No slot may begin less than 24 hours** in the future
-- All times must be in **UTC** in ISO 8601 format
+## Edge Case or Complexity
 
----
+A complexity that I stumbled upon was that it was required that “Slots must be exactly the duration minutes of the template”, which is straight forward with the example given in the initial prompt: an interview template having a duration of 60 minutes. As long as the interview template duration was a multiple of 30 then we are in business. It was not explicitly stated that interview template durations could have peculiar times (e.g. 45, 75, 80, etc.). 
 
-### 🧠 Developer Insight (Required)
+It mattered because these types of interviews would not fit nicely in available interview slots, allowing for the interview slot to be exactly the duration of minutes of the template. Each interviewer's availability is broken down into discrete 30 minute slots, but we need to identify unbroken sequences of these slots that match the required interview duration. Simply finding available slots wasn't enough, we have to verify that they formed a contiguous block without gaps.
 
-In addition to meeting the requirements above, we'd like you to demonstrate how you think beyond the surface.
+I solved this within **`get_interview_slots()`**, where I used a sliding window. First, we calculate the exact number of 30 minute slots required for out interview template’s duration 
 
-### ✅ What to Do:
+**`slots_needed = ceil(duration / slot_size)`**
 
-As part of your submission, please identify **one unique edge case or complexity** you encountered that wasn't explicitly mentioned in the prompt.
-
-- This could relate to availability overlaps, data inconsistencies, ambiguous logic, or system design.
-- Implement your handling of it in the code.
-- Add a short explanation in your README:
-    - What the case was
-    - Why it mattered
-    - How you handled it
-
-### 💡 Why:
-
-In real-world systems, requirements evolve and edge cases emerge. We want to see how you anticipate and reason about those situations — not just follow a spec.
-
----
-
-## 📦 Submission
-
-Submit a GitHub repo with:
-
-- All source code
-- Your own models, views, serializers
-- README with:
-    - Setup instructions
-    - Design decisions
-    - Your extra edge case write-up
-
----
-
-## 🚀 Running the Application
-
-### Option 1: Using Docker (Recommended)
-
-This project includes Docker configuration for easy setup and consistent environments.
-
-1. **Make sure Docker and Docker Compose are installed on your system**
-
-2. **Build and start the application**
-   ```bash
-   # Build and start all services
-   make up
-   
-   # Or alternatively
-   docker-compose up -d
-   ```
-
-3. **Run migrations**
-   ```bash
-   make migrate
-   
-   # Or alternatively
-   docker-compose exec web python manage.py migrate
-   ```
-
-4. **Create a superuser (optional)**
-   ```bash
-   make superuser
-   
-   # Or alternatively
-   docker-compose exec web python manage.py createsuperuser
-   ```
-
-5. **Load sample data (optional)**
-   ```bash
-   make loaddata
-   
-   # Or alternatively
-   docker-compose exec web python manage.py loaddata sample_data
-   ```
-
-6. **Access the API**
-   
-   The API will be available at: http://localhost:8000/api/interviews/<id>/availability
-
-### Other Useful Commands
-
-```bash
-# View logs
-make logs
-
-# Run tests
-make test
-
-# Stop all containers
-make down
-
-# Shell into web container
-make shell
-```
-
-### Option 2: Local Setup
-
-If you prefer running the application without Docker:
-
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd <repository-directory>
-   ```
-
-2. **Create and activate a virtual environment**
-   ```bash
-   python -m venv venv
-   
-   # On Windows
-   venv\Scripts\activate
-   
-   # On macOS/Linux
-   source venv/bin/activate
-   ```
-
-3. **Install dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
-
-4. **Apply migrations**
-   ```bash
-   python manage.py migrate
-   ```
-
-5. **Run the development server**
-   ```bash
-   python manage.py runserver
-   ```
-
-
-
+Then use each starting position of available slots shared between all assigned interviewers with the **`find_required_slots()`**  helper ****function. This function would would look at the potential sequence and identify if the sets of slots required is continuous by checking that each slot's end time matched the next slot's start time. Lastly, when a set of slots is verified to be continuous, then I would convert it to the formatted time range with the exact duration of the interview, not just the end time of the last slot. Overall the solution will now work efficiently with nonstandard interview template durations.

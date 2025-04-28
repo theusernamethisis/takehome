@@ -8,7 +8,7 @@ logger = logging.getLogger("interviews_availability")
 
 # set of all possible 30 min time slots and then remove the busy ones
 # free slots for an interviewer
-def get_available_slots(busy_slots: list[dict[str, str]]):
+def get_available_slots(busy_slots: list[dict[str, str]]) -> dict[date, list[tuple[time, time]]]:
     work_hours = (9, 17)  # 9 AM to 5 PM
     busy_days = defaultdict(set)
     dates = set()
