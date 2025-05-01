@@ -161,7 +161,7 @@ This will return all interview slots when given a range and template id.
 curl -X POST http://localhost:8000/api/interviews/availability_date_range_missing/ -H "Content-Type: application/json" -d '{"templateId": 2, "startDate": "2025-05-01T00:00:00Z", "endDate": "2025-05-07T23:59:59Z"}'
 ```
 
-This is purely for testing, it will add a third person with empty schedule to template id 3, which only shares a realtionship with 2 people. ```availability_date_range_missing()``` will pass a value of 2 for the days_to_deduct parameter in the ```get_free_busy_data_range()``` call to verify that all interviewers will be available prior to the end date.
+This is purely for testing, it will add a third person with empty schedule to template id 2 request, which originally only shared a realtionship with 2 people. ```availability_date_range_missing()``` will pass a value of 2 for the days_to_deduct parameter in the ```get_free_busy_data_range()``` call to verify that all interviewers will be available prior to the end date.
 
 
 ## Design
