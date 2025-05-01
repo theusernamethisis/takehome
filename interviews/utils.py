@@ -89,6 +89,85 @@ def get_available_slots(busy_slots: list[dict[str, str]]) -> dict[date, list[tup
     
     return all_available_slots
 
+def get_available_slots_range(interviewers_data: list[dict], start_date_str: str, end_date_str: str) -> dict[date, list[tuple[time, time]]]:
+    work_hours = (9, 17)  # 9 AM to 5 PM
+    busy_days = defaultdict(set)
+    cutoff_datetime = datetime.utcnow() + timedelta(hours=24)
+    
+    for interviewer in interviewers_data:
+        for slot in interviewer["busy"]:
+            start_dt = datetime.fromisoformat(slot["start"].rstrip("Z"))
+            end_dt = datetime.fromisoformat(slot["end"].rstrip("Z"))
+            day = start_dt.date()
+            
+            # Convert start time to 30-minute slot index (index: 0-48)
+            start_slot = start_dt.hour * 2
+            if start_dt.minute >= 30:
+                start_slot += 1
+                
+            # Convert end time to 30-minute slot index (index: 0-48)
+            end_slot = end_dt.hour * 2
+            if end_dt.minute > 0:
+                end_slot += 1
+                
+            # Add each 30 min slot that is busy period to busy_days
+            for slot30min in range(start_slot, end_slot):
+                busy_days[day].add(slot30min)
+    
+    start_date = datetime.fromisoformat(start_date_str.rstrip("Z")).date()
+    end_date = datetime.fromisoformat(end_date_str.rstrip("Z")).date()
+    
+    # Generate date range
+    dates = []
+    current_date = start_date
+    while current_date <= end_date:
+        dates.append(current_date)
+        current_date += timedelta(days=1)
+    
+    # find all available slots
+    all_available_slots = {}
+    for day in dates:
+        if day.weekday() >= 5: # Skip Saturday and Sunday (5, 6)
+            continue
+        
+        # All possible work hour 30-minute slots
+        # 16 slots per day
+        work_start_slot = work_hours[0] * 2  # 18
+        work_end_slot = work_hours[1] * 2    # 34
+        all_slots = set(range(work_start_slot, work_end_slot))
+        
+        # Remove busy slots
+        available_slots = all_slots - busy_days[day]
+        
+        # Convert to start and end time tuple (start_time, end_time)
+        slots = []
+        for free_slot in sorted(available_slots):
+            start_hour = free_slot // 2 # extract hour from 30-min time slot
+            if free_slot % 2 == 0:
+                start_minute = 0
+            else:
+                start_minute = 30
+            start_time = time(start_hour, start_minute)
+            
+            slot_datetime = datetime.combine(day, time(start_hour, start_minute))
+            if slot_datetime < cutoff_datetime: # check cutoff threshold 
+                continue
+            # Find end time (30 mins later)
+            end_hour = start_hour
+            if start_minute == 0:
+                end_minute = 30
+            else:
+                end_minute = 0
+                end_hour += 1  # When start time is at the 30 min mark jump to next hour
+                
+            end_time = time(end_hour, end_minute)
+            slots.append((start_time, end_time))
+        
+        if slots:  # Only add dates that have available slots
+            all_available_slots[day] = slots
+    
+    return all_available_slots
+
 def get_shared_slots(interviewers_availability: dict[int, dict[date, list[time]]]) -> dict[date, list[time]]:
     date_counts = defaultdict(dict)
     
@@ -162,6 +241,72 @@ def calc_available_slots(busy_data: list[dict], interviewer_ids: list[int], dura
     interview_slots = get_interview_slots(shared_slots, duration)
     log_interview_slots(interview_slots, duration)                   # /logs/interviews_availability.log
 
+    return interview_slots
+
+# def calc_available_slots_with_date_range(busy_data: list[dict], interviewer_ids: list[int], duration: int, start_date_str: str, end_date_str: str) -> list[dict[str, str]]:
+#     interviewers_availability = {}
+    
+#     for interviewer_id in interviewer_ids:
+#         interviewer_busy = None
+#         for item in busy_data:
+#             if item["interviewerId"] == interviewer_id:
+#                 interviewer_busy = item
+#                 break
+        
+#         available_slots = get_available_slots_range([interviewer_busy], start_date_str, end_date_str)
+#         log_available_slots(available_slots, interviewer_id)
+#         interviewers_availability[interviewer_id] = available_slots
+    
+#     shared_slots = get_shared_slots(interviewers_availability)
+#     log_available_slots(shared_slots)
+#     interview_slots = get_interview_slots(shared_slots, duration)
+#     log_interview_slots(interview_slots, duration)
+    
+#     return interview_slots
+
+def calc_available_slots_with_date_range(busy_data: list[dict], interviewer_ids: list[int], duration: int, start_date_str: str, end_date_str: str) -> list[dict[str, str]]:
+    interviewers_availability = {}
+    
+    # Debug: log what we're working with
+    logger.debug(f"Processing interviewer_ids: {interviewer_ids}")
+    
+    for interviewer_id in interviewer_ids:
+        # Debug: log which interviewer we're processing
+        logger.debug(f"Processing interviewer ID: {interviewer_id}")
+        
+        interviewer_busy = None
+        for item in busy_data:
+            if item["interviewerId"] == interviewer_id:
+                interviewer_busy = item
+                break
+        
+        # Debug: log what we found for this interviewer
+        logger.debug(f"Found interviewer_busy for ID {interviewer_id}: {interviewer_busy}")
+        
+        if interviewer_busy is None:
+            interviewer_busy = {
+                "interviewerId": interviewer_id,
+                "name": f"Interviewer {interviewer_id}",
+                "busy": []
+            }
+            # Debug: log when we create a default entry
+            logger.debug(f"Created default entry for ID {interviewer_id}")
+        
+        available_slots = get_available_slots_range([interviewer_busy], start_date_str, end_date_str)
+        # Debug: log what we got back
+        logger.debug(f"Available slots for ID {interviewer_id}: {available_slots}")
+        
+        log_available_slots(available_slots, interviewer_id)
+        interviewers_availability[interviewer_id] = available_slots
+    
+    # Debug: show what's in our final dictionary
+    logger.debug(f"Final interviewers_availability: {list(interviewers_availability.keys())}")
+    
+    shared_slots = get_shared_slots(interviewers_availability)
+    log_available_slots(shared_slots)
+    interview_slots = get_interview_slots(shared_slots, duration)
+    log_interview_slots(interview_slots, duration)
+    
     return interview_slots
 
 # use on:

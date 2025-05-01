@@ -32,7 +32,7 @@ Faker.seed(0)
 
 #     return busy_blocks
 
-# add random 30 mins at start or end
+#add random 30 mins at start or end
 def generate_busy_blocks(start_date, days=7):
     busy_blocks = []
     work_hours = (9, 17)  # Work hours from 9 AM to 5 PM
@@ -69,6 +69,59 @@ def generate_busy_blocks(start_date, days=7):
 
     return busy_blocks
 
+def generate_busy_blocks_with_range(start_date, end_date, days_to_deduct=0):
+    busy_blocks = []
+    work_hours = (9, 17)  # Work hours from 9 AM to 5 PM
+    
+    # Convert string dates to datetime objects if needed
+    if isinstance(start_date, str):
+        start_date = datetime.fromisoformat(start_date.rstrip('Z'))
+    if isinstance(end_date, str):
+        end_date = datetime.fromisoformat(end_date.rstrip('Z'))
+    
+    # Deduct days from end date if specified
+    if days_to_deduct > 0:
+        end_date = end_date - timedelta(days=days_to_deduct)
+    
+    # Ensure end date is not before start date
+    if end_date < start_date:
+        end_date = start_date
+    
+    # Calculate number of days in the range
+    days_in_range = (end_date - start_date).days + 1
+    
+    for _ in range(random.randint(3, 6)):
+        # Choose random day within the date range
+        day_offset = random.randint(0, days_in_range - 1)
+        date = start_date + timedelta(days=day_offset)
+        
+        # Choose random hour between 9 and 15 (to ensure end time <= 17)
+        start_hour = random.randint(work_hours[0], work_hours[1] - 2)
+        duration_hours = random.randint(1, 2)
+        
+        # to add or not to add 30 minutes
+        add_half_hour_start = random.choice([True, False])
+        start_dt = datetime.combine(date, time(start_hour, 0)).replace(tzinfo=None)
+        if add_half_hour_start:
+            start_dt += timedelta(minutes=30)
+        
+        add_half_hour_end = random.choice([True, False])
+        end_dt = start_dt + timedelta(hours=duration_hours)
+        if add_half_hour_end:
+            end_dt += timedelta(minutes=30)
+        
+        # dont go past work hours
+        end_of_day = datetime.combine(date, time(work_hours[1], 0))
+        if end_dt > end_of_day:
+            end_dt = end_of_day
+        
+        busy_blocks.append({
+            "start": start_dt.isoformat() + "Z",
+            "end": end_dt.isoformat() + "Z",
+        })
+    
+    return busy_blocks
+
 
 def get_free_busy_data(interviewer_ids: list[int], interviewer_names: dict[int, str]) -> list[dict]:
     start_date = datetime.utcnow().date()
@@ -77,25 +130,119 @@ def get_free_busy_data(interviewer_ids: list[int], interviewer_names: dict[int, 
     for id_ in interviewer_ids:
         interviewer = {
             "interviewerId": id_,
+            "name": interviewer_names[id_],
+            "busy": generate_busy_blocks(start_date)
+        }
+        data.append(interviewer)
+
+    return data
+
+def get_free_busy_data_range(interviewer_ids: list[int], interviewer_names: dict[int, str], start: str, end: str, days_to_deduct=0) -> list[dict]:
+    data = []
+    for id_ in interviewer_ids:
+        interviewer = {
+            "interviewerId": id_,
             "name": interviewer_names[id_], #fake.name(),
-            "busy": generate_busy_blocks(start_date)  # Changed from 'availability' to 'busy'
+            "busy": generate_busy_blocks_with_range(start, end, days_to_deduct)  # Changed from 'availability' to 'busy'
         }
         data.append(interviewer)
 
     return data 
 
 
-# def print_available_slots(available_slots):
-#     for date, slots in sorted(available_slots.items()):
-#         weekday = date.strftime("%A")
-#         date_str = f"{date.isoformat()} ({weekday})"
-#         print(f"\n{date_str}")
-#         print("-" * len(date_str))
+def get_available_slots_range(interviewers_data: list[dict], start_date_str: str, end_date_str: str) -> dict[date, list[tuple[time, time]]]:
+    work_hours = (9, 17)  # 9 AM to 5 PM
+    busy_days = defaultdict(set)
+    cutoff_datetime = datetime.utcnow() + timedelta(hours=24)
+    
+    # Extract busy slots from interviewer data
+    for interviewer in interviewers_data:
+        for slot in interviewer["busy"]:
+            start_dt = datetime.fromisoformat(slot["start"].rstrip("Z"))
+            end_dt = datetime.fromisoformat(slot["end"].rstrip("Z"))
+            day = start_dt.date()
+            
+            # Convert start time to 30-minute slot index (index: 0-48)
+            start_slot = start_dt.hour * 2
+            if start_dt.minute >= 30:
+                start_slot += 1
+                
+            # Convert end time to 30-minute slot index (index: 0-48)
+            end_slot = end_dt.hour * 2
+            if end_dt.minute > 0:
+                end_slot += 1
+                
+            # Add each 30 min slot that is busy period to busy_days
+            for slot30min in range(start_slot, end_slot):
+                busy_days[day].add(slot30min)
+    
+    # Parse ISO 8601 dates
+    start_date = datetime.fromisoformat(start_date_str.rstrip("Z")).date()
+    end_date = datetime.fromisoformat(end_date_str.rstrip("Z")).date()
+    
+    # Generate date range
+    dates = []
+    current_date = start_date
+    while current_date <= end_date:
+        dates.append(current_date)
+        current_date += timedelta(days=1)
+    
+    # find all available slots
+    all_available_slots = {}
+    for day in dates:
+        if day.weekday() >= 5: # Skip Saturday and Sunday (5, 6)
+            continue
         
-#         for start_time, end_time in slots:
-#             start_str = start_time.strftime("%I:%M %p").lstrip("0")
-#             end_str = end_time.strftime("%I:%M %p").lstrip("0")
-#             print(f"  {start_str} - {end_str}")
+        # All possible work hour 30-minute slots
+        # 16 slots per day
+        work_start_slot = work_hours[0] * 2  # 18
+        work_end_slot = work_hours[1] * 2    # 34
+        all_slots = set(range(work_start_slot, work_end_slot))
+        
+        # Remove busy slots
+        available_slots = all_slots - busy_days[day]
+        
+        # Convert to start and end time tuple (start_time, end_time)
+        slots = []
+        for free_slot in sorted(available_slots):
+            start_hour = free_slot // 2 # extract hour from 30-min time slot
+            if free_slot % 2 == 0:
+                start_minute = 0
+            else:
+                start_minute = 30
+            start_time = time(start_hour, start_minute)
+            
+            slot_datetime = datetime.combine(day, time(start_hour, start_minute))
+            if slot_datetime < cutoff_datetime: # check cutoff threshold 
+                continue
+            # Find end time (30 mins later)
+            end_hour = start_hour
+            if start_minute == 0:
+                end_minute = 30
+            else:
+                end_minute = 0
+                end_hour += 1  # When start time is at the 30 min mark jump to next hour
+                
+            end_time = time(end_hour, end_minute)
+            slots.append((start_time, end_time))
+        
+        if slots:  # Only add dates that have available slots
+            all_available_slots[day] = slots
+    
+    return all_available_slots
+
+
+def print_available_slots(available_slots):
+    for date, slots in sorted(available_slots.items()):
+        weekday = date.strftime("%A")
+        date_str = f"{date.isoformat()} ({weekday})"
+        print(f"\n{date_str}")
+        print("-" * len(date_str))
+        
+        for start_time, end_time in slots:
+            start_str = start_time.strftime("%I:%M %p").lstrip("0")
+            end_str = end_time.strftime("%I:%M %p").lstrip("0")
+            print(f"  {start_str} - {end_str}")
 
 # # set of all possible 30 min time slots and then remove the busy ones
 # def get_available_slots(busy_slots: list[dict[str, str]]):
@@ -237,13 +384,15 @@ def get_free_busy_data(interviewer_ids: list[int], interviewer_names: dict[int, 
     
 #     return available_interviews
 
-# data = get_free_busy_data([1, 2])
-# print(json.dumps(data, indent=4))
+# data = get_free_busy_data([1, 2], {1: "d", 2:"e"})
+# #print(json.dumps(data, indent=4))
 
-# i1 = get_available_slots(data[0]["busy"])
-# i2 = get_available_slots(data[1]["busy"])
+# # i1 = get_available_slots(data[0]["busy"])
+# # i2 = get_available_slots(data[1]["busy"])
 
-# #print_available_slots(i1)
+# i1 = get_available_slots(data, "2025-05-01T00:00:00Z", "2025-05-14T00:00:00Z")
+
+# print_available_slots(i1)
 # print("\n**************************************\n")
 # #print_available_slots(i2)
 
