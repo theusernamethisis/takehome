@@ -147,6 +147,23 @@ Available 45-minute interview slots:
 }
 ```
 
+## Added Funtionality
+
+### Date Range
+```bash
+curl -X POST http://localhost:8000/api/interviews/availability_date_range/ -H "Content-Type: application/json" -d '{"templateId": 2, "startDate": "2025-05-01T00:00:00Z", "endDate": "2025-05-07T23:59:59Z"}'
+```
+
+This will return all interview slots when given a range and template id. 
+
+### Person with empty schedule
+```bash
+curl -X POST http://localhost:8000/api/interviews/availability_date_range_missing/ -H "Content-Type: application/json" -d '{"templateId": 2, "startDate": "2025-05-01T00:00:00Z", "endDate": "2025-05-07T23:59:59Z"}'
+```
+
+This is purely for testing, it will add a third person with empty schedule to template id 3, which only shares a realtionship with 2 people. ```availability_date_range_missing()``` will pass a value of 2 for the days_to_deduct parameter in the ```get_free_busy_data_range()``` call to verify that all interviewers will be available prior to the end date.
+
+
 ## Design
 
 Obtaining the slots of busy time (in hours) for interviewers is done calling **`get_free_busy_data()`** to generate mock data. In the constraints, it is stated that “Slots must begin on hour or half-hour marks**”** which aligns with the returned mock data. While working on a solution, I realized that interview templates that are ≤ 30 mins would fill an interviewers full available slots, since it is in hour intervals. This seemed inefficient, so I made the design decision to change how the creation of available interviewer slots is done. Instead of hour slots, I increased the resolution by finding all 30 minute free periods for the interviews within **`get_available_slots()`.** I also adjusted **`get_free_busy_data()`** to randomly add 30 mins to start or end of each busy block to reflect my change, even though the hour blocks it previously generated will still work with my solution, now I can have slots which begin on both hour and half-hour marks. 
